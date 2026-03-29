@@ -1,0 +1,1347 @@
+<!DOCTYPE html>
+<html lang="th" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Application Center</title>
+
+    <!-- Google Fonts: Kanit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <!-- SortableJS (Drag & Drop) -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+
+    <!-- TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Kanit', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: '#C8A97E',
+                        primaryHover: '#B8976C',
+                        bgLight: '#F8F8F8',
+                        bgDark: '#0F172A',
+                        cardLight: '#FFFFFF',
+                        cardDark: '#1E293B',
+                        textDark: '#F1F5F9',
+                        textLight: '#334155'
+                    },
+                    borderRadius: {
+                        '2xl': '16px',
+                    },
+                    boxShadow: {
+                        'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Custom Styles & Transitions */
+        body { font-family: 'Kanit', sans-serif; transition: background-color 0.3s, color 0.3s; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .dark ::-webkit-scrollbar-thumb { background: #475569; }
+
+        /* Toast Animation */
+        .toast-enter { transform: translateX(100%); opacity: 0; }
+        .toast-enter-active { transform: translateX(0); opacity: 1; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .toast-leave { transform: translateX(0); opacity: 1; }
+        .toast-leave-active { transform: translateX(100%); opacity: 0; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+
+        /* Toggle Switch CSS */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #C8A97E;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #C8A97E;
+        }
+
+        /* Glassmorphism for Modals */
+        .modal-backdrop {
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+        }
+
+        /* Hide Scrollbar for App Grid but allow scroll */
+        .hide-scroll::-webkit-scrollbar { display: none; }
+        .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-bgLight dark:bg-bgDark text-textLight dark:text-textDark antialiased min-h-screen flex flex-col overflow-x-hidden">
+
+    <!-- Global Loading Overlay -->
+    <div id="globalLoading" class="fixed inset-0 bg-white/80 dark:bg-gray-900/80 z-[100] hidden items-center justify-center modal-backdrop">
+        <div class="flex flex-col items-center">
+            <i class="ph ph-spinner-gap animate-spin text-5xl text-primary mb-4"></i>
+            <p class="text-lg font-medium animate-pulse">กำลังโหลดข้อมูล...</p>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="fixed top-5 right-5 z-[90] flex flex-col gap-3 max-w-sm w-full pointer-events-none"></div>
+
+    <!-- Confirm Dialog Modal -->
+    <div id="confirmModal" class="fixed inset-0 bg-black/50 z-[80] hidden items-center justify-center modal-backdrop opacity-0 transition-opacity duration-300">
+        <div class="bg-white dark:bg-cardDark p-6 rounded-2xl shadow-soft w-full max-w-md transform scale-95 transition-transform duration-300 m-4">
+            <div class="flex items-center gap-4 mb-4 text-red-500">
+                <div class="p-3 bg-red-100 dark:bg-red-900/30 rounded-full">
+                    <i class="ph ph-warning-circle text-2xl"></i>
+                </div>
+                <h3 id="confirmTitle" class="text-xl font-semibold text-gray-800 dark:text-white">ยืนยันการดำเนินการ</h3>
+            </div>
+            <p id="confirmMessage" class="text-gray-600 dark:text-gray-400 mb-6 ml-16">คุณแน่ใจหรือไม่ที่จะลบข้อมูลนี้?</p>
+            <div class="flex justify-end gap-3 mt-6">
+                <button id="btnConfirmCancel" class="px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">ยกเลิก</button>
+                <button id="btnConfirmOk" class="px-4 py-2 rounded-xl bg-red-500 text-white hover:bg-red-600 shadow-lg shadow-red-500/30 transition-all">ยืนยันลบ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== LOGIN VIEW ==================== -->
+    <div id="loginView" class="flex-1 flex items-center justify-center p-4">
+        <div class="w-full max-w-md">
+            <div class="text-center mb-8">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 text-primary mb-4">
+                    <i class="ph-fill ph-circles-four text-3xl"></i>
+                </div>
+                <h1 class="text-3xl font-bold text-gray-800 dark:text-white">Hug Dee Home App Center</h1>
+                <p class="text-gray-500 dark:text-gray-400 mt-2">เข้าสู่ระบบเพื่อดำเนินการต่อ</p>
+            </div>
+            
+            <form id="loginForm" class="bg-white dark:bg-cardDark rounded-2xl p-8 shadow-soft border border-gray-100 dark:border-gray-800">
+                <div class="space-y-5">
+                    <div>
+                        <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">ชื่อผู้ใช้ (Username)</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                                <i class="ph ph-user"></i>
+                            </div>
+                            <input type="text" id="loginUsername" required class="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all dark:text-white" placeholder="กรอกชื่อผู้ใช้">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">รหัสผ่าน (Password)</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                                <i class="ph ph-lock-key"></i>
+                            </div>
+                            <input type="password" id="loginPassword" required class="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all dark:text-white" placeholder="กรอกรหัสผ่าน">
+                        </div>
+                    </div>
+                    <button type="submit" id="btnLogin" class="w-full bg-primary hover:bg-primaryHover text-white font-medium py-3 rounded-xl shadow-lg shadow-primary/30 transition-all transform hover:-translate-y-0.5 flex justify-center items-center gap-2 mt-4">
+                        <span>เข้าสู่ระบบ</span>
+                        <i class="ph ph-sign-in text-lg"></i>
+                    </button>
+                </div>
+                <div class="mt-6 text-center">
+                    <button type="button" onclick="openForgotPasswordModal()" class="text-sm text-gray-500 hover:text-primary dark:text-gray-400 dark:hover:text-primary transition-colors font-medium">ลืมรหัสผ่าน?</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ==================== MAIN APPLICATION VIEW ==================== -->
+    <div id="mainView" class="hidden flex-col min-h-screen">
+        
+        <!-- Navbar -->
+        <nav class="bg-white dark:bg-cardDark border-b border-gray-200 dark:border-gray-800 sticky top-0 z-40 transition-colors">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16">
+                    <div class="flex items-center gap-3 cursor-pointer" onclick="navigate('dashboard')">
+                        <div class="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                            <i class="ph-fill ph-circles-four text-xl"></i>
+                        </div>
+                        <span class="text-xl font-bold text-gray-800 dark:text-white tracking-tight"> Hug Dee Home App Center</span>
+                    </div>
+
+                    <div class="flex items-center gap-2 sm:gap-4">
+                        <!-- Navigation Links (Admin Only) -->
+                        <div id="adminNavLinks" class="hidden items-center gap-1 mr-4 border-r border-gray-200 dark:border-gray-700 pr-4">
+                            <button onclick="navigate('dashboard')" class="nav-btn px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300" data-target="dashboard">แอปพลิเคชัน</button>
+                            <button onclick="navigate('users')" class="nav-btn px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300" data-target="users">จัดการผู้ใช้</button>
+                        </div>
+
+                        <!-- Dark Mode Toggle -->
+                        <button onclick="toggleDarkMode()" class="p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" title="สลับโหมดหน้าจอ">
+                            <i id="themeIcon" class="ph ph-moon text-xl"></i>
+                        </button>
+
+                        <!-- User Menu -->
+                        <div class="relative ml-2">
+                            <button onclick="toggleUserMenu()" class="flex items-center gap-2 p-1 pr-3 rounded-full border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors focus:outline-none">
+                                <div class="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm" id="userAvatar">A</div>
+                                <div class="hidden sm:block text-left">
+                                    <div class="text-sm font-medium text-gray-700 dark:text-gray-200 leading-none" id="displayUserName">Admin</div>
+                                    <div class="text-xs text-primary mt-1 leading-none" id="displayUserRole">Administrator</div>
+                                </div>
+                                <i class="ph ph-caret-down text-gray-400 text-xs ml-1 hidden sm:block"></i>
+                            </button>
+
+                            <!-- Dropdown -->
+                            <div id="userMenuDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white dark:bg-cardDark rounded-xl shadow-lg border border-gray-100 dark:border-gray-800 py-1 origin-top-right transition-all">
+                                <button onclick="navigate('profile')" class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2">
+                                    <i class="ph ph-user-circle text-lg"></i> โปรไฟล์ส่วนตัว
+                                </button>
+                                <div class="border-t border-gray-100 dark:border-gray-800 my-1"></div>
+                                <button onclick="handleLogout()" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2">
+                                    <i class="ph ph-sign-out text-lg"></i> ออกจากระบบ
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
+            
+            <!-- 2. Dashboard (App Grid) -->
+            <div id="view-dashboard" class="view-section active">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-800 dark:text-white">แอปพลิเคชันของคุณ</h2>
+                        <p class="text-gray-500 dark:text-gray-400 text-sm mt-1">เลือกแอปพลิเคชันที่ต้องการใช้งาน</p>
+                    </div>
+                    <!-- Admin Add App Button -->
+                    <button id="btnAddApp" onclick="openAppModal()" class="hidden bg-primary hover:bg-primaryHover text-white px-4 py-2 rounded-xl shadow-md shadow-primary/20 transition-all flex items-center gap-2">
+                        <i class="ph ph-plus-circle text-lg"></i>
+                        <span>เพิ่มแอปพลิเคชัน</span>
+                    </button>
+                </div>
+
+                <div id="appGrid" class="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-6">
+                    <!-- Cards will be injected here via JS -->
+                </div>
+                
+                <div id="emptyAppMessage" class="hidden flex-col items-center justify-center py-20 text-center">
+                    <div class="w-24 h-24 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center text-gray-400 mb-4">
+                        <i class="ph ph-app-window text-4xl"></i>
+                    </div>
+                    <h3 class="text-lg font-medium text-gray-800 dark:text-gray-200">ไม่มีแอปพลิเคชัน</h3>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm max-w-xs mt-2">ยังไม่มีแอปพลิเคชันที่คุณสามารถเข้าถึงได้ในขณะนี้</p>
+                </div>
+            </div>
+
+            <!-- 5. User Management -->
+            <div id="view-users" class="view-section hidden">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-800 dark:text-white">จัดการผู้ใช้งาน</h2>
+                        <p class="text-gray-500 dark:text-gray-400 text-sm mt-1">เพิ่ม ลบ หรือแก้ไขข้อมูลผู้ใช้และสิทธิ์การเข้าถึง</p>
+                    </div>
+                    <button onclick="openUserModal()" class="bg-primary hover:bg-primaryHover text-white px-4 py-2 rounded-xl shadow-md shadow-primary/20 transition-all flex items-center gap-2">
+                        <i class="ph ph-user-plus text-lg"></i>
+                        <span>เพิ่มผู้ใช้ใหม่</span>
+                    </button>
+                </div>
+
+                <div class="bg-white dark:bg-cardDark rounded-2xl shadow-soft border border-gray-100 dark:border-gray-800 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-300">
+                                    <th class="py-4 px-6 font-medium">รหัสพนักงาน</th>
+                                    <th class="py-4 px-6 font-medium">ชื่อ - นามสกุล</th>
+                                    <th class="py-4 px-6 font-medium">Username</th>
+                                    <th class="py-4 px-6 font-medium">สิทธิ์ (Role)</th>
+                                    <th class="py-4 px-6 font-medium text-right">จัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="userTableBody" class="divide-y divide-gray-100 dark:divide-gray-800">
+                                <!-- User rows injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 6. Profile Page -->
+            <div id="view-profile" class="view-section hidden max-w-2xl mx-auto">
+                <div class="mb-8 text-center sm:text-left">
+                    <h2 class="text-2xl font-bold text-gray-800 dark:text-white">โปรไฟล์ส่วนตัว</h2>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm mt-1">จัดการข้อมูลส่วนตัวของคุณ</p>
+                </div>
+
+                <div class="bg-white dark:bg-cardDark rounded-2xl p-6 sm:p-8 shadow-soft border border-gray-100 dark:border-gray-800">
+                    <div class="flex flex-col sm:flex-row items-center gap-6 mb-8">
+                        <div class="w-24 h-24 rounded-full bg-primary/20 text-primary flex items-center justify-center text-4xl font-bold" id="profileAvatarBig">A</div>
+                        <div class="text-center sm:text-left">
+                            <h3 class="text-xl font-bold text-gray-800 dark:text-white" id="profileNameDisplay">-</h3>
+                            <p class="text-gray-500 dark:text-gray-400 text-sm mt-1" id="profileRoleDisplay">-</p>
+                        </div>
+                    </div>
+
+                    <form id="profileForm" class="space-y-5">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                            <div>
+                                <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">รหัสพนักงาน</label>
+                                <input type="text" id="profEmpId" disabled class="w-full px-4 py-2.5 bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-500 cursor-not-allowed">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Username</label>
+                                <input type="text" id="profUsername" disabled class="w-full px-4 py-2.5 bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-500 cursor-not-allowed">
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">ชื่อ - นามสกุล</label>
+                            <input type="text" id="profName" required class="w-full px-4 py-2.5 bg-white dark:bg-cardDark border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none dark:text-white transition-all">
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                            <div>
+                                <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">ชื่อเล่น</label>
+                                <input type="text" id="profNickname" class="w-full px-4 py-2.5 bg-white dark:bg-cardDark border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none dark:text-white transition-all">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">อีเมล</label>
+                                <input type="email" id="profEmail" class="w-full px-4 py-2.5 bg-white dark:bg-cardDark border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none dark:text-white transition-all">
+                            </div>
+                        </div>
+
+                        <div class="pt-4 border-t border-gray-100 dark:border-gray-800">
+                            <p class="text-sm text-gray-500 mb-4">ปล่อยว่างไว้หากไม่ต้องการเปลี่ยนรหัสผ่าน</p>
+                            <div>
+                                <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">รหัสผ่านใหม่</label>
+                                <input type="password" id="profPassword" class="w-full px-4 py-2.5 bg-white dark:bg-cardDark border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none dark:text-white transition-all" placeholder="••••••••">
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end pt-4">
+                            <button type="submit" class="bg-primary hover:bg-primaryHover text-white px-6 py-2.5 rounded-xl shadow-lg shadow-primary/30 transition-all flex items-center gap-2">
+                                <i class="ph ph-floppy-disk text-lg"></i>
+                                <span>บันทึกข้อมูล</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- ==================== MODALS ==================== -->
+
+    <!-- 4. Add/Edit App Modal -->
+    <div id="appModal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center modal-backdrop opacity-0 transition-opacity duration-300 overflow-y-auto py-10">
+        <div class="bg-white dark:bg-cardDark p-6 sm:p-8 rounded-2xl shadow-soft w-full max-w-lg transform scale-95 transition-transform duration-300 m-4 relative my-auto">
+            <button onclick="closeAppModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
+                <i class="ph ph-x text-xl"></i>
+            </button>
+            <h3 id="appModalTitle" class="text-2xl font-bold text-gray-800 dark:text-white mb-6">เพิ่มแอปพลิเคชัน</h3>
+            
+            <form id="appForm" class="space-y-4">
+                <input type="hidden" id="appId">
+                
+                <div class="flex items-center justify-between mb-4 bg-gray-50 dark:bg-gray-800/50 p-3 rounded-xl">
+                    <label class="text-sm font-medium text-gray-700 dark:text-gray-300">สถานะเปิดใช้งาน (Active)</label>
+                    <div class="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in">
+                        <input type="checkbox" name="toggle" id="appActive" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer border-gray-300 dark:border-gray-600 transition-all z-10" checked/>
+                        <label for="appActive" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 dark:bg-gray-600 cursor-pointer transition-colors"></label>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">ชื่อแอปพลิเคชัน *</label>
+                    <input type="text" id="appName" required class="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none dark:text-white transition-all">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Icon (Phosphor Icon Class) *</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="appIcon" required placeholder="ex: users, chart-bar, envelope" class="flex-1 px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none dark:text-white transition-all">
+                        <div class="w-11 h-11 bg-gray-100 dark:bg-gray-800 rounded-xl flex items-center justify-center text-primary text-xl" id="iconPreview">
+                            <i class="ph ph-app-window"></i>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-1">อ้างอิงจาก <a href="https://phosphoricons.com/" target="_blank" class="text-primary hover:underline">Phosphor Icons</a> (ไม่ต้องใส่ ph ph-)</p>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">รายละเอียด</label>
+                    <textarea id="appDesc" rows="2" class="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none dark:text-white transition-all"></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">URL / Link *</label>
+                    <input type="url" id="appUrl" required placeholder="https://..." class="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none dark:text-white transition-all">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">สิทธิ์การเข้าถึง (Roles) *</label>
+                    <div class="flex flex-wrap gap-3 p-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" value="admin" class="app-role-checkbox w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded">
+                            <span class="text-sm dark:text-gray-300">ผู้ดูแลระบบ</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" value="staff" class="app-role-checkbox w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded">
+                            <span class="text-sm dark:text-gray-300">เจ้าหน้าที่</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" value="employee" class="app-role-checkbox w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded">
+                            <span class="text-sm dark:text-gray-300">พนักงาน</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" value="therapist" class="app-role-checkbox w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded">
+                            <span class="text-sm dark:text-gray-300">นักกิจกรรมบำบัด</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-3 pt-4 mt-2 border-t border-gray-100 dark:border-gray-800">
+                    <button type="button" onclick="closeAppModal()" class="px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">ยกเลิก</button>
+                    <button type="submit" class="px-6 py-2.5 rounded-xl bg-primary hover:bg-primaryHover text-white shadow-lg shadow-primary/30 transition-all">บันทึก</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 5. Add/Edit User Modal -->
+    <div id="userModal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center modal-backdrop opacity-0 transition-opacity duration-300 overflow-y-auto py-10">
+        <div class="bg-white dark:bg-cardDark p-6 sm:p-8 rounded-2xl shadow-soft w-full max-w-lg transform scale-95 transition-transform duration-300 m-4 relative my-auto">
+            <button onclick="closeUserModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
+                <i class="ph ph-x text-xl"></i>
+            </button>
+            <h3 id="userModalTitle" class="text-2xl font-bold text-gray-800 dark:text-white mb-6">เพิ่มผู้ใช้ใหม่</h3>
+            
+            <form id="userForm" class="space-y-4">
+                <input type="hidden" id="userId">
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">รหัสพนักงาน *</label>
+                        <input type="text" id="uEmpId" required class="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-primary outline-none dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">สิทธิ์ (Role) *</label>
+                        <select id="uRole" required class="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-primary outline-none dark:text-white appearance-none">
+                            <option value="" disabled selected>-- เลือกสิทธิ์การใช้งาน --</option>
+                            <option value="therapist">นักกิจกรรมบำบัด</option>
+                            <option value="employee">พนักงาน</option>
+                            <option value="staff">เจ้าหน้าที่</option>
+                            <option value="admin">ผู้ดูแลระบบ</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">ชื่อ - นามสกุล *</label>
+                    <input type="text" id="uName" required class="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-primary outline-none dark:text-white">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">ชื่อเล่น</label>
+                        <input type="text" id="uNickname" class="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-primary outline-none dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">อีเมล</label>
+                        <input type="email" id="uEmail" class="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-primary outline-none dark:text-white">
+                    </div>
+                </div>
+
+                <div class="pt-2 border-t border-gray-100 dark:border-gray-800 mt-4">
+                    <div class="grid grid-cols-2 gap-4 mt-2">
+                        <div>
+                            <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Username *</label>
+                            <input type="text" id="uUsername" required autocomplete="off" class="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-primary outline-none dark:text-white">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Password <span id="pwdReqStar" class="text-red-500">*</span></label>
+                            <input type="password" id="uPassword" autocomplete="new-password" class="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-primary outline-none dark:text-white" placeholder="••••••••">
+                            <p id="pwdHint" class="text-[10px] text-gray-400 mt-1 hidden">ปล่อยว่างหากไม่เปลี่ยน</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-3 pt-4 mt-4 border-t border-gray-100 dark:border-gray-800">
+                    <button type="button" onclick="closeUserModal()" class="px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">ยกเลิก</button>
+                    <button type="submit" class="px-6 py-2.5 rounded-xl bg-primary hover:bg-primaryHover text-white shadow-lg shadow-primary/30 transition-all">บันทึก</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 6. Forgot Password Modal -->
+    <div id="forgotPasswordModal" class="fixed inset-0 bg-black/50 z-[60] hidden items-center justify-center modal-backdrop opacity-0 transition-opacity duration-300 overflow-y-auto py-10">
+        <div class="bg-white dark:bg-cardDark p-8 rounded-[24px] shadow-soft w-full max-w-md transform scale-95 transition-transform duration-300 m-4 relative my-auto">
+            <div class="text-center mb-8">
+                <h3 class="text-3xl font-bold text-primary mb-2 drop-shadow-sm">ตั้งรหัสผ่านใหม่</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400 font-medium">กรอกข้อมูลเพื่อยืนยันตัวตนและตั้งรหัสผ่านใหม่</p>
+            </div>
+            
+            <form id="forgotPasswordForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold mb-1.5 text-gray-700 dark:text-gray-300">Username</label>
+                    <input type="text" id="fpUsername" required class="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none dark:text-white transition-all shadow-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-1.5 text-gray-700 dark:text-gray-300">Email</label>
+                    <input type="email" id="fpEmail" required class="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none dark:text-white transition-all shadow-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-1.5 text-gray-700 dark:text-gray-300">รหัสผ่านใหม่</label>
+                    <input type="password" id="fpNewPassword" required class="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none dark:text-white transition-all shadow-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-1.5 text-gray-700 dark:text-gray-300">ยืนยันรหัสผ่านใหม่</label>
+                    <input type="password" id="fpConfirmPassword" required class="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none dark:text-white transition-all shadow-sm">
+                </div>
+                
+                <div class="pt-6 flex flex-col gap-3">
+                    <button type="submit" class="w-full py-3.5 rounded-xl bg-primary hover:bg-primaryHover text-white font-semibold shadow-lg shadow-primary/30 transition-all text-sm">ยืนยันการเปลี่ยนรหัสผ่าน</button>
+                    <button type="button" onclick="closeForgotPasswordModal()" class="w-full py-3.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-semibold hover:bg-gray-200 dark:hover:bg-gray-700 transition-all text-sm">กลับไปหน้าล็อกอิน</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ==================== JAVASCRIPT LOGIC ==================== -->
+    <script>
+        // 🔗 การตั้งค่า API
+        // หากต้องการใช้ Google Apps Script จริง ให้นำ URL มาใส่ที่นี่ (ex. 'https://script.google.com/macros/s/.../exec')
+        // หากเป็นค่าว่าง ระบบจะใช้ Mock Data อัตโนมัติเพื่อจำลองการทำงาน
+        const GAS_URL = 'https://script.google.com/macros/s/AKfycbywsznNYwutYFiV9gUKrphx2wALBX79uCjD-7BxbGA_p6vwlmtFNaQDTajzScls95piAA/exec'; 
+
+        // ==================== STATE MANAGEMENT ====================
+        const state = {
+            currentUser: null,
+            apps: [],
+            users: [],
+            currentView: 'dashboard',
+            sortableInstance: null
+        };
+
+        const roleDisplayNames = {
+            'admin': 'ผู้ดูแลระบบ',
+            'staff': 'เจ้าหน้าที่',
+            'employee': 'พนักงาน',
+            'therapist': 'นักกิจกรรมบำบัด'
+        };
+
+        // ==================== MOCK DATA ====================
+        const mockUsers = [
+            { id: 'u1', empId: 'EMP001', name: 'ผู้ดูแลระบบ', nickname: 'แอดมิน', email: 'admin@company.com', username: 'admin', password: 'password', role: 'admin' },
+            { id: 'u2', empId: 'EMP002', name: 'พนักงาน ทั่วไป', nickname: 'ยูเซอร์', email: 'user@company.com', username: 'user', password: 'password', role: 'employee' }
+        ];
+
+        let mockApps = [
+            { id: 'a1', name: 'HR Leave System', icon: 'calendar-check', desc: 'ระบบลาออนไลน์และตรวจสอบวันหยุด', url: '#', roles: ['admin', 'staff', 'employee'], active: true, order: 1 },
+            { id: 'a2', name: 'Expense Claim', icon: 'receipt', desc: 'ระบบเบิกจ่ายค่าใช้จ่ายพนักงาน', url: '#', roles: ['admin', 'employee'], active: true, order: 2 },
+            { id: 'a3', name: 'Admin Dashboard', icon: 'chart-pie-slice', desc: 'ระบบรายงานสำหรับผู้บริหารและ HR', url: '#', roles: ['admin'], active: true, order: 3 },
+            { id: 'a4', name: 'IT Support Ticket', icon: 'headset', desc: 'แจ้งซ่อมและร้องขออุปกรณ์ IT', url: '#', roles: ['admin', 'staff', 'employee'], active: false, order: 4 },
+        ];
+
+        // ==================== API SERVICE (Mock/Real) ====================
+        const api = {
+            async call(action, payload = null) {
+                showLoading();
+                try {
+                    if (GAS_URL) {
+                        // REAL GAS FETCH
+                        const options = {
+                            method: payload ? 'POST' : 'GET',
+                            // เปลี่ยนจาก application/json เป็น text/plain เพื่อเลี่ยงปัญหา CORS preflight ใน Google Apps Script
+                            headers: payload ? { 'Content-Type': 'text/plain;charset=utf-8' } : {}
+                        };
+                        if (payload) options.body = JSON.stringify({ action, ...payload });
+                        
+                        const url = payload ? GAS_URL : `${GAS_URL}?action=${action}`;
+                        const res = await fetch(url, options);
+                        const data = await res.json();
+                        hideLoading();
+                        return data;
+                    } else {
+                        // MOCK DELAY (Simulate Network)
+                        await new Promise(r => setTimeout(r, 800));
+                        hideLoading();
+                        return this.mockResolver(action, payload);
+                    }
+                } catch (error) {
+                    hideLoading();
+                    showToast('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์', 'error');
+                    console.error(error);
+                    throw error;
+                }
+            },
+            
+            mockResolver(action, payload) {
+                switch(action) {
+                    case 'login':
+                        const user = mockUsers.find(u => u.username === payload.username && u.password === payload.password);
+                        if (user) {
+                            const { password, ...safeUser } = user;
+                            return { success: true, user: safeUser };
+                        }
+                        return { success: false, message: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' };
+                    case 'getApps': return { success: true, data: [...mockApps].sort((a,b)=>a.order - b.order) };
+                    case 'getUsers': return { success: true, data: mockUsers.map(u => { const {password, ...rest} = u; return rest; }) };
+                    
+                    // App Actions
+                    case 'saveApp':
+                        if (payload.id) {
+                            const idx = mockApps.findIndex(a => a.id === payload.id);
+                            mockApps[idx] = { ...mockApps[idx], ...payload };
+                        } else {
+                            mockApps.push({ ...payload, id: 'a' + Date.now(), order: mockApps.length + 1 });
+                        }
+                        return { success: true };
+                    case 'deleteApp':
+                        mockApps = mockApps.filter(a => a.id !== payload.id);
+                        return { success: true };
+                    case 'updateAppOrder':
+                        // payload.order is array of IDs
+                        payload.order.forEach((id, index) => {
+                            const app = mockApps.find(a => a.id === id);
+                            if(app) app.order = index + 1;
+                        });
+                        return { success: true };
+                    case 'toggleAppActive':
+                        const targetApp = mockApps.find(a => a.id === payload.id);
+                        if(targetApp) targetApp.active = payload.active;
+                        return { success: true };
+
+                    // User Actions
+                    case 'saveUser':
+                        if (payload.id) {
+                            const idx = mockUsers.findIndex(u => u.id === payload.id);
+                            // Only update password if provided
+                            const updatedUser = { ...mockUsers[idx], ...payload };
+                            if(!payload.password) updatedUser.password = mockUsers[idx].password; 
+                            mockUsers[idx] = updatedUser;
+                        } else {
+                            // Check duplicate username
+                            if(mockUsers.some(u => u.username === payload.username)) {
+                                return { success: false, message: 'Username นี้มีในระบบแล้ว' };
+                            }
+                            mockUsers.push({ ...payload, id: 'u' + Date.now() });
+                        }
+                        return { success: true };
+                    case 'deleteUser':
+                        mockUsers = mockUsers.filter(u => u.id !== payload.id);
+                        return { success: true };
+                    case 'updateProfile':
+                        const pIdx = mockUsers.findIndex(u => u.id === payload.id);
+                        mockUsers[pIdx] = { ...mockUsers[pIdx], ...payload };
+                        if(!payload.password) mockUsers[pIdx].password = state.currentUser.password; // Mock logic hack
+                        return { success: true, user: mockUsers[pIdx] };
+                    case 'resetPassword':
+                        // จำลองการเช็ค Username และ Email ให้ตรงกันก่อนอนุญาตให้เปลี่ยนรหัส
+                        const targetUserForReset = mockUsers.find(u => u.username === payload.username && u.email === payload.email);
+                        if (targetUserForReset) {
+                            targetUserForReset.password = payload.newPassword;
+                            return { success: true };
+                        }
+                        return { success: false, message: 'ไม่พบ Username หรือ Email นี้ในระบบ' };
+                    default: return { success: false };
+                }
+            }
+        };
+
+        // ==================== UI HELPERS ====================
+        function showLoading() {
+            const el = document.getElementById('globalLoading');
+            el.classList.remove('hidden');
+            el.classList.add('flex');
+        }
+        
+        function hideLoading() {
+            const el = document.getElementById('globalLoading');
+            el.classList.add('hidden');
+            el.classList.remove('flex');
+        }
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            
+            const colors = type === 'success' 
+                ? 'bg-white dark:bg-cardDark border-l-4 border-green-500 text-gray-700 dark:text-gray-200' 
+                : 'bg-white dark:bg-cardDark border-l-4 border-red-500 text-gray-700 dark:text-gray-200';
+            
+            const icon = type === 'success' ? 'ph-check-circle text-green-500' : 'ph-warning-circle text-red-500';
+
+            toast.className = `flex items-center gap-3 w-full p-4 rounded-xl shadow-lg border-gray-100 dark:border-gray-800 ${colors} pointer-events-auto toast-enter`;
+            toast.innerHTML = `
+                <i class="ph ${icon} text-2xl"></i>
+                <p class="font-medium text-sm flex-1">${message}</p>
+                <button onclick="this.parentElement.remove()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"><i class="ph ph-x"></i></button>
+            `;
+            
+            container.appendChild(toast);
+            
+            // Trigger animation
+            requestAnimationFrame(() => {
+                toast.classList.remove('toast-enter');
+                toast.classList.add('toast-enter-active');
+            });
+
+            setTimeout(() => {
+                toast.classList.remove('toast-enter-active');
+                toast.classList.add('toast-leave');
+                requestAnimationFrame(() => {
+                    toast.classList.remove('toast-leave');
+                    toast.classList.add('toast-leave-active');
+                });
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        let confirmCallback = null;
+        function showConfirm(title, message, onConfirm) {
+            document.getElementById('confirmTitle').innerText = title;
+            document.getElementById('confirmMessage').innerText = message;
+            confirmCallback = onConfirm;
+            
+            const modal = document.getElementById('confirmModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            // Small delay for transition
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modal.querySelector('div').classList.remove('scale-95');
+            }, 10);
+        }
+
+        function closeConfirm() {
+            const modal = document.getElementById('confirmModal');
+            modal.classList.add('opacity-0');
+            modal.querySelector('div').classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                confirmCallback = null;
+            }, 300);
+        }
+
+        document.getElementById('btnConfirmCancel').addEventListener('click', closeConfirm);
+        document.getElementById('btnConfirmOk').addEventListener('click', () => {
+            if(confirmCallback) confirmCallback();
+            closeConfirm();
+        });
+
+        // ==================== THEME (Dark Mode) ====================
+        function toggleDarkMode() {
+            document.documentElement.classList.toggle('dark');
+            const isDark = document.documentElement.classList.contains('dark');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            updateThemeIcon(isDark);
+        }
+
+        function updateThemeIcon(isDark) {
+            const icon = document.getElementById('themeIcon');
+            if(isDark) {
+                icon.className = 'ph ph-sun text-xl text-yellow-400';
+            } else {
+                icon.className = 'ph ph-moon text-xl';
+            }
+        }
+
+        // ==================== AUTH & INIT ====================
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const u = document.getElementById('loginUsername').value;
+            const p = document.getElementById('loginPassword').value;
+            
+            // ตรวจสอบบัญชี Admin พิเศษแบบ Hardcode (ไม่ต้องใช้ Database)
+            if (u === 'admin' && p === 'admin0100') {
+                const sysAdminUser = {
+                    id: 'sys-admin',
+                    empId: 'SYS000',
+                    role: 'admin',
+                    name: 'ผู้ดูแลระบบ (System)',
+                    nickname: 'Admin',
+                    email: 'admin@system.local',
+                    username: 'admin'
+                };
+                
+                state.currentUser = sysAdminUser;
+                localStorage.setItem('appCenterUser', JSON.stringify(sysAdminUser));
+                initApp();
+                showToast(`ยินดีต้อนรับคุณ ${sysAdminUser.name}`);
+                return; // จบการทำงาน ไม่ต้องเรียก API
+            }
+
+            const res = await api.call('login', { username: u, password: p });
+            if(res.success) {
+                state.currentUser = res.user;
+                localStorage.setItem('appCenterUser', JSON.stringify(res.user));
+                initApp();
+                showToast(`ยินดีต้อนรับคุณ ${res.user.name}`);
+            } else {
+                showToast(res.message, 'error');
+            }
+        });
+
+        function handleLogout() {
+            localStorage.removeItem('appCenterUser');
+            state.currentUser = null;
+            state.apps = [];
+            state.users = [];
+            document.getElementById('loginView').classList.remove('hidden');
+            document.getElementById('mainView').classList.add('hidden');
+            document.getElementById('mainView').classList.remove('flex');
+            document.getElementById('loginForm').reset();
+            toggleUserMenu(false);
+        }
+
+        function checkSession() {
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+                updateThemeIcon(true);
+            }
+
+            const savedUser = localStorage.getItem('appCenterUser');
+            if (savedUser) {
+                state.currentUser = JSON.parse(savedUser);
+                initApp();
+            }
+        }
+
+        async function initApp() {
+            // Hide login, show main
+            document.getElementById('loginView').classList.add('hidden');
+            document.getElementById('mainView').classList.remove('hidden');
+            document.getElementById('mainView').classList.add('flex');
+
+            // Set user UI info
+            const u = state.currentUser;
+            document.getElementById('displayUserName').innerText = u.name;
+            document.getElementById('displayUserRole').innerText = roleDisplayNames[u.role] || u.role.toUpperCase();
+            document.getElementById('userAvatar').innerText = u.name.charAt(0);
+            document.getElementById('profileAvatarBig').innerText = u.name.charAt(0);
+
+            // Handle Admin UI
+            const isAdmin = u.role === 'admin';
+            if (isAdmin) {
+                document.getElementById('adminNavLinks').classList.remove('hidden');
+                document.getElementById('adminNavLinks').classList.add('flex');
+                document.getElementById('btnAddApp').classList.remove('hidden');
+            } else {
+                document.getElementById('adminNavLinks').classList.add('hidden');
+                document.getElementById('adminNavLinks').classList.remove('flex');
+                document.getElementById('btnAddApp').classList.add('hidden');
+            }
+
+            // Fetch Data
+            await loadApps();
+            if(isAdmin) await loadUsers();
+
+            navigate('dashboard');
+        }
+
+        // ==================== ROUTING ====================
+        function navigate(viewId) {
+            state.currentView = viewId;
+            
+            // Update Active Nav Buttons
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                if(btn.dataset.target === viewId) {
+                    btn.classList.add('bg-primary/10', 'text-primary', 'dark:bg-primary/20', 'dark:text-primary');
+                    btn.classList.remove('text-gray-600', 'hover:bg-gray-100', 'dark:text-gray-300', 'dark:hover:bg-gray-800');
+                } else {
+                    btn.classList.remove('bg-primary/10', 'text-primary', 'dark:bg-primary/20', 'dark:text-primary');
+                    btn.classList.add('text-gray-600', 'hover:bg-gray-100', 'dark:text-gray-300', 'dark:hover:bg-gray-800');
+                }
+            });
+
+            // Hide all views, show target
+            document.querySelectorAll('.view-section').forEach(v => {
+                v.classList.add('hidden');
+            });
+            document.getElementById(`view-${viewId}`).classList.remove('hidden');
+
+            // Specific View Logic
+            if(viewId === 'dashboard') renderApps();
+            if(viewId === 'users' && state.currentUser.role === 'admin') renderUsers();
+            if(viewId === 'profile') populateProfile();
+        }
+
+        function toggleUserMenu(forceState) {
+            const menu = document.getElementById('userMenuDropdown');
+            if(forceState === false) {
+                menu.classList.add('hidden');
+                return;
+            }
+            menu.classList.toggle('hidden');
+        }
+
+        // Close dropdown when clicking outside
+        window.addEventListener('click', (e) => {
+            const menu = document.getElementById('userMenuDropdown');
+            const btn = menu.previousElementSibling;
+            if (!menu.contains(e.target) && !btn.contains(e.target) && !menu.classList.contains('hidden')) {
+                menu.classList.add('hidden');
+            }
+        });
+
+        // ==================== DASHBOARD (APPS) ====================
+        async function loadApps() {
+            const res = await api.call('getApps');
+            if(res.success) state.apps = res.data;
+        }
+
+        function renderApps() {
+            const container = document.getElementById('appGrid');
+            const emptyMsg = document.getElementById('emptyAppMessage');
+            container.innerHTML = '';
+            
+            const isAdmin = state.currentUser.role === 'admin';
+            
+            // Filter apps based on role
+            const visibleApps = state.apps.filter(app => {
+                // Admin sees all, others see only active apps they have roles for
+                if(isAdmin) return true;
+                return app.active && app.roles.includes(state.currentUser.role);
+            });
+
+            if(visibleApps.length === 0) {
+                emptyMsg.classList.remove('hidden');
+                emptyMsg.classList.add('flex');
+            } else {
+                emptyMsg.classList.add('hidden');
+                emptyMsg.classList.remove('flex');
+                
+                visibleApps.forEach(app => {
+                    const card = document.createElement('div');
+                    card.className = `group bg-white dark:bg-cardDark rounded-2xl p-6 shadow-soft border border-gray-100 dark:border-gray-800 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg relative flex flex-col h-full ${!app.active ? 'opacity-60' : ''}`;
+                    card.dataset.id = app.id;
+                    
+                    let adminControls = '';
+                    if(isAdmin) {
+                        adminControls = `
+                            <div class="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onclick="toggleAppStatus('${app.id}', ${!app.active})" class="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-primary hover:bg-primary/10 transition-colors" title="${app.active ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}">
+                                    <i class="ph ${app.active ? 'ph-eye' : 'ph-eye-slash'}"></i>
+                                </button>
+                                <button onclick="editApp('${app.id}')" class="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors" title="แก้ไข">
+                                    <i class="ph ph-pencil-simple"></i>
+                                </button>
+                                <button onclick="confirmDeleteApp('${app.id}')" class="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="ลบ">
+                                    <i class="ph ph-trash"></i>
+                                </button>
+                                <div class="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 cursor-move drag-handle hover:text-gray-700 dark:hover:text-gray-200">
+                                    <i class="ph ph-dots-six-vertical"></i>
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    const badgeColors = {
+                        admin: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+                        staff: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+                        employee: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+                        therapist: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
+                    };
+                    const roleBadges = app.roles.map(r => `<span class="text-[10px] px-2 py-0.5 rounded-full font-medium ${badgeColors[r] || badgeColors.employee}">${roleDisplayNames[r] || r}</span>`).join('');
+
+                    card.innerHTML = `
+                        ${adminControls}
+                        ${!app.active && isAdmin ? '<div class="absolute -top-3 -left-3 bg-gray-500 text-white text-[10px] px-2 py-1 rounded-lg font-medium shadow-md">ปิดการใช้งาน</div>' : ''}
+                        
+                        <div class="w-14 h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center text-3xl mb-4 group-hover:scale-110 transition-transform">
+                            <i class="ph ph-${app.icon || 'app-window'}"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-gray-800 dark:text-white mb-1">${app.name}</h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 flex-1 line-clamp-2">${app.desc || 'ไม่มีรายละเอียด'}</p>
+                        
+                        <div class="flex flex-wrap gap-1 mt-4 mb-5">
+                            ${roleBadges}
+                        </div>
+
+                        <a href="${app.url}" target="_blank" class="block w-full text-center py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 font-medium hover:bg-primary hover:text-white hover:border-primary transition-all mt-auto group-hover:bg-primary group-hover:text-white group-hover:border-primary group-hover:shadow-md group-hover:shadow-primary/20">
+                            เปิดใช้งาน
+                        </a>
+                    `;
+                    container.appendChild(card);
+                });
+
+                // Init SortableJS for Admins
+                if(isAdmin) {
+                    if(state.sortableInstance) state.sortableInstance.destroy();
+                    state.sortableInstance = new Sortable(container, {
+                        animation: 150,
+                        handle: '.drag-handle',
+                        ghostClass: 'opacity-50',
+                        onEnd: async function () {
+                            // Get new order
+                            const newOrderIds = Array.from(container.children).map(el => el.dataset.id);
+                            // Update local state purely for order (not mutating actual objects yet)
+                            state.apps.sort((a,b) => newOrderIds.indexOf(a.id) - newOrderIds.indexOf(b.id));
+                            // Save to API
+                            await api.call('updateAppOrder', { order: newOrderIds });
+                        },
+                    });
+                }
+            }
+        }
+
+        // --- APP MODAL ---
+        document.getElementById('appIcon').addEventListener('input', (e) => {
+            const val = e.target.value.trim() || 'app-window';
+            document.getElementById('iconPreview').innerHTML = `<i class="ph ph-${val}"></i>`;
+        });
+
+        function openAppModal(appId = null) {
+            const modal = document.getElementById('appModal');
+            const form = document.getElementById('appForm');
+            form.reset();
+            document.getElementById('iconPreview').innerHTML = `<i class="ph ph-app-window"></i>`;
+            document.getElementById('appId').value = '';
+
+            if (appId) {
+                document.getElementById('appModalTitle').innerText = 'แก้ไขแอปพลิเคชัน';
+                const app = state.apps.find(a => a.id === appId);
+                if(app) {
+                    document.getElementById('appId').value = app.id;
+                    document.getElementById('appName').value = app.name;
+                    document.getElementById('appIcon').value = app.icon;
+                    document.getElementById('iconPreview').innerHTML = `<i class="ph ph-${app.icon}"></i>`;
+                    document.getElementById('appDesc').value = app.desc;
+                    document.getElementById('appUrl').value = app.url;
+                    document.getElementById('appActive').checked = app.active;
+                    
+                    document.querySelectorAll('.app-role-checkbox').forEach(cb => {
+                        cb.checked = app.roles.includes(cb.value);
+                    });
+                }
+            } else {
+                document.getElementById('appModalTitle').innerText = 'เพิ่มแอปพลิเคชันใหม่';
+                document.getElementById('appActive').checked = true;
+                // Default checked all roles for new app
+                document.querySelectorAll('.app-role-checkbox').forEach(cb => cb.checked = true);
+            }
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modal.querySelector('div').classList.remove('scale-95');
+            }, 10);
+        }
+
+        function closeAppModal() {
+            const modal = document.getElementById('appModal');
+            modal.classList.add('opacity-0');
+            modal.querySelector('div').classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }, 300);
+        }
+
+        document.getElementById('appForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const roles = Array.from(document.querySelectorAll('.app-role-checkbox:checked')).map(cb => cb.value);
+            if(roles.length === 0) {
+                showToast('กรุณาเลือกสิทธิ์การเข้าถึงอย่างน้อย 1 สิทธิ์', 'error');
+                return;
+            }
+
+            const payload = {
+                id: document.getElementById('appId').value || undefined,
+                name: document.getElementById('appName').value,
+                icon: document.getElementById('appIcon').value,
+                desc: document.getElementById('appDesc').value,
+                url: document.getElementById('appUrl').value,
+                active: document.getElementById('appActive').checked,
+                roles: roles
+            };
+
+            const res = await api.call('saveApp', payload);
+            if(res.success) {
+                showToast('บันทึกข้อมูลแอปพลิเคชันเรียบร้อย');
+                closeAppModal();
+                await loadApps();
+                renderApps();
+            }
+        });
+
+        async function toggleAppStatus(id, newStatus) {
+            const res = await api.call('toggleAppActive', { id, active: newStatus });
+            if(res.success) {
+                showToast(newStatus ? 'เปิดใช้งานแอปแล้ว' : 'ปิดใช้งานแอปแล้ว');
+                await loadApps();
+                renderApps();
+            }
+        }
+
+        function editApp(id) {
+            openAppModal(id);
+        }
+
+        function confirmDeleteApp(id) {
+            const app = state.apps.find(a => a.id === id);
+            showConfirm('ลบแอปพลิเคชัน', `ต้องการลบแอป "${app.name}" ใช่หรือไม่? ข้อมูลจะไม่สามารถกู้คืนได้`, async () => {
+                const res = await api.call('deleteApp', { id });
+                if(res.success) {
+                    showToast('ลบแอปพลิเคชันเรียบร้อย');
+                    await loadApps();
+                    renderApps();
+                }
+            });
+        }
+
+        // ==================== USER MANAGEMENT ====================
+        async function loadUsers() {
+            const res = await api.call('getUsers');
+            if(res.success) state.users = res.data;
+        }
+
+        function renderUsers() {
+            const tbody = document.getElementById('userTableBody');
+            tbody.innerHTML = '';
+            
+            state.users.forEach(u => {
+                const roleColors = {
+                    admin: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+                    staff: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+                    employee: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+                    therapist: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
+                };
+                
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors border-b border-gray-50 dark:border-gray-800 last:border-0';
+                tr.innerHTML = `
+                    <td class="py-3 px-6 whitespace-nowrap text-sm font-medium text-gray-800 dark:text-gray-200">${u.empId}</td>
+                    <td class="py-3 px-6 whitespace-nowrap">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-xs">${u.name.charAt(0)}</div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-800 dark:text-white">${u.name}</p>
+                                <p class="text-xs text-gray-500">${u.email || '-'}</p>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="py-3 px-6 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">@${u.username}</td>
+                    <td class="py-3 px-6 whitespace-nowrap">
+                        <span class="text-[11px] px-2.5 py-1 rounded-full font-medium ${roleColors[u.role] || roleColors.employee}">${roleDisplayNames[u.role] || u.role.toUpperCase()}</span>
+                    </td>
+                    <td class="py-3 px-6 whitespace-nowrap text-right">
+                        <div class="flex justify-end gap-2">
+                            <button onclick="editUser('${u.id}')" class="p-1.5 rounded text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors" title="แก้ไข">
+                                <i class="ph ph-pencil-simple text-lg"></i>
+                            </button>
+                            ${u.id !== state.currentUser.id ? `
+                            <button onclick="confirmDeleteUser('${u.id}')" class="p-1.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="ลบ">
+                                <i class="ph ph-trash text-lg"></i>
+                            </button>
+                            ` : '<div class="w-[30px]"></div>'}
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function openUserModal(userId = null) {
+            const modal = document.getElementById('userModal');
+            const form = document.getElementById('userForm');
+            form.reset();
+            document.getElementById('userId').value = '';
+            
+            const pwdInput = document.getElementById('uPassword');
+            const pwdReqStar = document.getElementById('pwdReqStar');
+            const pwdHint = document.getElementById('pwdHint');
+
+            if (userId) {
+                document.getElementById('userModalTitle').innerText = 'แก้ไขข้อมูลผู้ใช้';
+                const user = state.users.find(u => u.id === userId);
+                if(user) {
+                    document.getElementById('userId').value = user.id;
+                    document.getElementById('uEmpId').value = user.empId;
+                    document.getElementById('uRole').value = user.role;
+                    document.getElementById('uName').value = user.name;
+                    document.getElementById('uNickname').value = user.nickname || '';
+                    document.getElementById('uEmail').value = user.email || '';
+                    document.getElementById('uUsername').value = user.username;
+                    
+                    pwdInput.required = false;
+                    pwdReqStar.classList.add('hidden');
+                    pwdHint.classList.remove('hidden');
+                }
+            } else {
+                document.getElementById('userModalTitle').innerText = 'เพิ่มผู้ใช้ใหม่';
+                pwdInput.required = true;
+                pwdReqStar.classList.remove('hidden');
+                pwdHint.classList.add('hidden');
+            }
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modal.querySelector('div').classList.remove('scale-95');
+            }, 10);
+        }
+
+        function closeUserModal() {
+            const modal = document.getElementById('userModal');
+            modal.classList.add('opacity-0');
+            modal.querySelector('div').classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }, 300);
+        }
+
+        document.getElementById('userForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const payload = {
+                id: document.getElementById('userId').value || undefined,
+                empId: document.getElementById('uEmpId').value,
+                role: document.getElementById('uRole').value,
+                name: document.getElementById('uName').value,
+                nickname: document.getElementById('uNickname').value,
+                email: document.getElementById('uEmail').value,
+                username: document.getElementById('uUsername').value,
+            };
+
+            const pwd = document.getElementById('uPassword').value;
+            if(pwd) payload.password = pwd;
+
+            const res = await api.call('saveUser', payload);
+            if(res.success) {
+                showToast('บันทึกข้อมูลผู้ใช้เรียบร้อย');
+                closeUserModal();
+                await loadUsers();
+                renderUsers();
+            } else {
+                showToast(res.message || 'เกิดข้อผิดพลาด', 'error');
+            }
+        });
+
+        function editUser(id) { openUserModal(id); }
+
+        function confirmDeleteUser(id) {
+            const user = state.users.find(u => u.id === id);
+            showConfirm('ลบผู้ใช้งาน', `ต้องการลบผู้ใช้ "${user.name}" ใช่หรือไม่?`, async () => {
+                const res = await api.call('deleteUser', { id });
+                if(res.success) {
+                    showToast('ลบผู้ใช้เรียบร้อย');
+                    await loadUsers();
+                    renderUsers();
+                }
+            });
+        }
+
+        // ==================== PROFILE ====================
+        function populateProfile() {
+            const u = state.currentUser;
+            document.getElementById('profEmpId').value = u.empId || '';
+            document.getElementById('profUsername').value = u.username || '';
+            document.getElementById('profName').value = u.name || '';
+            document.getElementById('profNickname').value = u.nickname || '';
+            document.getElementById('profEmail').value = u.email || '';
+            document.getElementById('profPassword').value = '';
+            
+            document.getElementById('profileNameDisplay').innerText = u.name;
+            document.getElementById('profileRoleDisplay').innerText = roleDisplayNames[u.role] || u.role.toUpperCase();
+        }
+
+        document.getElementById('profileForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // ป้องกันบัญชี System Admin (Hardcode) อัปเดตข้อมูล เพราะไม่มีในฐานข้อมูล
+            if (state.currentUser.id === 'sys-admin') {
+                showToast('บัญชีผู้ดูแลระบบหลัก (System Admin) ไม่สามารถแก้ไขโปรไฟล์ได้', 'error');
+                return;
+            }
+
+            const payload = {
+                id: state.currentUser.id,
+                name: document.getElementById('profName').value,
+                nickname: document.getElementById('profNickname').value,
+                email: document.getElementById('profEmail').value,
+            };
+
+            const pwd = document.getElementById('profPassword').value;
+            if(pwd) payload.password = pwd;
+
+            const res = await api.call('updateProfile', payload);
+            if(res.success) {
+                showToast('อัปเดตโปรไฟล์เรียบร้อย');
+                // Update local session
+                state.currentUser = res.user;
+                localStorage.setItem('appCenterUser', JSON.stringify(res.user));
+                // Update UI elements
+                document.getElementById('displayUserName').innerText = res.user.name;
+                document.getElementById('userAvatar').innerText = res.user.name.charAt(0);
+                populateProfile();
+            }
+        });
+
+        // ==================== FORGOT PASSWORD ====================
+        function openForgotPasswordModal() {
+            const modal = document.getElementById('forgotPasswordModal');
+            document.getElementById('forgotPasswordForm').reset();
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modal.querySelector('div').classList.remove('scale-95');
+            }, 10);
+        }
+
+        function closeForgotPasswordModal() {
+            const modal = document.getElementById('forgotPasswordModal');
+            modal.classList.add('opacity-0');
+            modal.querySelector('div').classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }, 300);
+        }
+
+        document.getElementById('forgotPasswordForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const u = document.getElementById('fpUsername').value;
+            const em = document.getElementById('fpEmail').value;
+            const p1 = document.getElementById('fpNewPassword').value;
+            const p2 = document.getElementById('fpConfirmPassword').value;
+
+            if (p1 !== p2) {
+                showToast('รหัสผ่านและการยืนยันรหัสผ่านไม่ตรงกัน', 'error');
+                return;
+            }
+            if (p1.length < 4) {
+                showToast('รหัสผ่านต้องมีความยาวอย่างน้อย 4 ตัวอักษร', 'error');
+                return;
+            }
+
+            const res = await api.call('resetPassword', { username: u, email: em, newPassword: p1 });
+            if(res.success) {
+                showToast('ตั้งรหัสผ่านใหม่สำเร็จ กรุณาล็อกอินใหม่');
+                closeForgotPasswordModal();
+            } else {
+                showToast(res.message || 'ข้อมูลไม่ถูกต้อง', 'error');
+            }
+        });
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', checkSession);
+
+    </script>
+</body>
+</html>

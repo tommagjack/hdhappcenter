@@ -167,7 +167,7 @@
                         <div class="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
                             <i class="ph-fill ph-circles-four text-xl"></i>
                         </div>
-                        <span class="text-xl font-bold text-gray-800 dark:text-white tracking-tight"> Hug Dee Home App Center</span>
+                        <span class="text-xl font-bold text-gray-800 dark:text-white tracking-tight">Hug Dee Home App Center</span>
                     </div>
 
                     <div class="flex items-center gap-2 sm:gap-4">
@@ -176,6 +176,11 @@
                             <button onclick="navigate('dashboard')" class="nav-btn px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300" data-target="dashboard">แอปพลิเคชัน</button>
                             <button onclick="navigate('users')" class="nav-btn px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300" data-target="users">จัดการผู้ใช้</button>
                         </div>
+
+                        <!-- Refresh Button -->
+                        <button onclick="refreshCurrentView()" class="p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" title="รีเฟรชข้อมูล">
+                            <i id="refreshIcon" class="ph ph-arrows-clockwise text-xl"></i>
+                        </button>
 
                         <!-- Dark Mode Toggle -->
                         <button onclick="toggleDarkMode()" class="p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" title="สลับโหมดหน้าจอ">
@@ -874,6 +879,31 @@
             if(viewId === 'dashboard') renderApps();
             if(viewId === 'users' && state.currentUser.role === 'admin') renderUsers();
             if(viewId === 'profile') populateProfile();
+        }
+
+        async function refreshCurrentView() {
+            const icon = document.getElementById('refreshIcon');
+            icon.classList.add('animate-spin'); // เพิ่ม Animation หมุน
+            
+            try {
+                if (state.currentView === 'dashboard') {
+                    await loadApps();
+                    renderApps();
+                    showToast('อัปเดตข้อมูลแอปพลิเคชันล่าสุดแล้ว');
+                } else if (state.currentView === 'users' && state.currentUser.role === 'admin') {
+                    await loadUsers();
+                    renderUsers();
+                    showToast('อัปเดตข้อมูลผู้ใช้ล่าสุดแล้ว');
+                } else if (state.currentView === 'profile') {
+                    // หากมี API ดึงข้อมูลโปรไฟล์ สามารถใส่ได้ที่นี่ ตอนนี้เป็นการรีโหลด UI
+                    populateProfile();
+                    showToast('อัปเดตข้อมูลโปรไฟล์ล่าสุดแล้ว');
+                }
+            } catch (error) {
+                console.error('Refresh error:', error);
+            } finally {
+                icon.classList.remove('animate-spin'); // หยุดหมุนเมื่อเสร็จสิ้น
+            }
         }
 
         function toggleUserMenu(forceState) {

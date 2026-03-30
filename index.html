@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hug Dee Home Application Center</title>
+    <title>Application Center</title>
 
     <!-- Google Fonts: Kanit -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -231,8 +231,9 @@
                     </button>
                 </div>
 
-                <div id="appGrid" class="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-6">
-                    <!-- Cards will be injected here via JS -->
+                <!-- Changed from grid to flex column to hold category sections -->
+                <div id="appGrid" class="flex flex-col gap-8">
+                    <!-- Categories and Cards will be injected here via JS -->
                 </div>
                 
                 <div id="emptyAppMessage" class="hidden flex-col items-center justify-center py-20 text-center">
@@ -368,6 +369,11 @@
                     <input type="text" id="appName" required class="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none dark:text-white transition-all">
                 </div>
                 
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">หมวดหมู่ (Category)</label>
+                    <input type="text" id="appCategory" placeholder="เช่น ระบบบริการคลินิก, ระบบบริหารจัดการ" class="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none dark:text-white transition-all">
+                </div>
+
                 <div>
                     <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Icon (Phosphor Icon Class) *</label>
                     <div class="flex gap-2">
@@ -532,7 +538,7 @@
             apps: [],
             users: [],
             currentView: 'dashboard',
-            sortableInstance: null
+            sortableInstances: [] // Changed from single to array for multiple sections
         };
 
         const roleDisplayNames = {
@@ -549,10 +555,10 @@
         ];
 
         let mockApps = [
-            { id: 'a1', name: 'HR Leave System', icon: 'calendar-check', desc: 'ระบบลาออนไลน์และตรวจสอบวันหยุด', url: '#', roles: ['admin', 'staff', 'employee'], active: true, order: 1 },
-            { id: 'a2', name: 'Expense Claim', icon: 'receipt', desc: 'ระบบเบิกจ่ายค่าใช้จ่ายพนักงาน', url: '#', roles: ['admin', 'employee'], active: true, order: 2 },
-            { id: 'a3', name: 'Admin Dashboard', icon: 'chart-pie-slice', desc: 'ระบบรายงานสำหรับผู้บริหารและ HR', url: '#', roles: ['admin'], active: true, order: 3 },
-            { id: 'a4', name: 'IT Support Ticket', icon: 'headset', desc: 'แจ้งซ่อมและร้องขออุปกรณ์ IT', url: '#', roles: ['admin', 'staff', 'employee'], active: false, order: 4 },
+            { id: 'a1', name: 'HR Leave System', category: 'ระบบจัดการทรัพยากรบุคคล', icon: 'calendar-check', desc: 'ระบบลาออนไลน์และตรวจสอบวันหยุด', url: '#', roles: ['admin', 'staff', 'employee'], active: true, order: 1 },
+            { id: 'a2', name: 'Expense Claim', category: 'ระบบบริหารจัดการรายรับ-รายจ่าย', icon: 'receipt', desc: 'ระบบเบิกจ่ายค่าใช้จ่ายพนักงาน', url: '#', roles: ['admin', 'employee'], active: true, order: 2 },
+            { id: 'a3', name: 'Admin Dashboard', category: 'ระบบบริหารจัดการคลินิก', icon: 'chart-pie-slice', desc: 'ระบบรายงานสำหรับผู้บริหารและ HR', url: '#', roles: ['admin'], active: true, order: 3 },
+            { id: 'a4', name: 'IT Support Ticket', category: 'ระบบจัดการทรัพยากรบุคคล', icon: 'headset', desc: 'แจ้งซ่อมและร้องขออุปกรณ์ IT', url: '#', roles: ['admin', 'staff', 'employee'], active: false, order: 4 },
         ];
 
         // ==================== API SERVICE (Mock/Real) ====================
@@ -935,11 +941,16 @@
             const emptyMsg = document.getElementById('emptyAppMessage');
             container.innerHTML = '';
             
+            // Clean up old sortable instances
+            if (state.sortableInstances && state.sortableInstances.length > 0) {
+                state.sortableInstances.forEach(instance => instance.destroy());
+            }
+            state.sortableInstances = [];
+            
             const isAdmin = state.currentUser.role === 'admin';
             
             // Filter apps based on role
             const visibleApps = state.apps.filter(app => {
-                // Admin sees all, others see only active apps they have roles for
                 if(isAdmin) return true;
                 return app.active && app.roles.includes(state.currentUser.role);
             });
@@ -951,77 +962,141 @@
                 emptyMsg.classList.add('hidden');
                 emptyMsg.classList.remove('flex');
                 
-                visibleApps.forEach(app => {
-                    const card = document.createElement('div');
-                    card.className = `group bg-white dark:bg-cardDark rounded-2xl p-6 shadow-soft border border-gray-100 dark:border-gray-800 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg relative flex flex-col h-full ${!app.active ? 'opacity-60' : ''}`;
-                    card.dataset.id = app.id;
+                // Group apps by category
+                const groupedApps = visibleApps.reduce((acc, app) => {
+                    const category = app.category && app.category.trim() !== '' ? app.category : 'แอปพลิเคชันทั่วไป';
+                    if (!acc[category]) acc[category] = [];
+                    acc[category].push(app);
+                    return acc;
+                }, {});
+
+                // Render each category section
+                Object.entries(groupedApps).forEach(([category, appsInSection], index) => {
+                    const safeCatId = `cat-grid-${index}`;
+                    const iconId = `cat-icon-${index}`;
                     
-                    let adminControls = '';
-                    if(isAdmin) {
-                        adminControls = `
-                            <div class="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onclick="toggleAppStatus('${app.id}', ${!app.active})" class="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-primary hover:bg-primary/10 transition-colors" title="${app.active ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}">
-                                    <i class="ph ${app.active ? 'ph-eye' : 'ph-eye-slash'}"></i>
-                                </button>
-                                <button onclick="editApp('${app.id}')" class="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors" title="แก้ไข">
-                                    <i class="ph ph-pencil-simple"></i>
-                                </button>
-                                <button onclick="confirmDeleteApp('${app.id}')" class="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="ลบ">
-                                    <i class="ph ph-trash"></i>
-                                </button>
-                                <div class="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 cursor-move drag-handle hover:text-gray-700 dark:hover:text-gray-200">
-                                    <i class="ph ph-dots-six-vertical"></i>
-                                </div>
-                            </div>
-                        `;
-                    }
-
-                    const badgeColors = {
-                        admin: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
-                        staff: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-                        employee: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
-                        therapist: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
-                    };
-                    const roleBadges = app.roles.map(r => `<span class="text-[10px] px-2 py-0.5 rounded-full font-medium ${badgeColors[r] || badgeColors.employee}">${roleDisplayNames[r] || r}</span>`).join('');
-
-                    card.innerHTML = `
-                        ${adminControls}
-                        ${!app.active && isAdmin ? '<div class="absolute -top-3 -left-3 bg-gray-500 text-white text-[10px] px-2 py-1 rounded-lg font-medium shadow-md">ปิดการใช้งาน</div>' : ''}
-                        
-                        <div class="w-14 h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center text-3xl mb-4 group-hover:scale-110 transition-transform">
-                            <i class="ph ph-${app.icon || 'app-window'}"></i>
+                    // Create Section Wrapper
+                    const sectionDiv = document.createElement('div');
+                    sectionDiv.className = 'flex flex-col gap-4';
+                    
+                    // Section Header (Accordion Toggle)
+                    sectionDiv.innerHTML = `
+                        <div class="flex items-center justify-between cursor-pointer border-b border-gray-200 dark:border-gray-800 pb-2 transition-opacity hover:opacity-80" onclick="toggleCategory('${safeCatId}', '${iconId}')">
+                            <h3 class="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                                <i class="ph-fill ph-folder-notch text-primary text-2xl"></i>
+                                ${category}
+                                <span class="text-xs font-medium text-gray-500 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full ml-1">${appsInSection.length}</span>
+                            </h3>
+                            <button class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors p-1">
+                                <i id="${iconId}" class="ph ph-caret-up text-xl transition-transform duration-300"></i>
+                            </button>
                         </div>
-                        <h3 class="text-lg font-bold text-gray-800 dark:text-white mb-1">${app.name}</h3>
-                        <p class="text-sm text-gray-500 dark:text-gray-400 flex-1 line-clamp-2">${app.desc || 'ไม่มีรายละเอียด'}</p>
-                        
-                        <div class="flex flex-wrap gap-1 mt-4 mb-5">
-                            ${roleBadges}
+                        <div id="${safeCatId}" class="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-6 transition-all duration-300 origin-top">
                         </div>
-
-                        <a href="${app.url}" target="_blank" class="block w-full text-center py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 font-medium hover:bg-primary hover:text-white hover:border-primary transition-all mt-auto group-hover:bg-primary group-hover:text-white group-hover:border-primary group-hover:shadow-md group-hover:shadow-primary/20">
-                            เปิดใช้งาน
-                        </a>
                     `;
-                    container.appendChild(card);
-                });
+                    
+                    container.appendChild(sectionDiv);
+                    const gridContainer = document.getElementById(safeCatId);
 
-                // Init SortableJS for Admins
-                if(isAdmin) {
-                    if(state.sortableInstance) state.sortableInstance.destroy();
-                    state.sortableInstance = new Sortable(container, {
-                        animation: 150,
-                        handle: '.drag-handle',
-                        ghostClass: 'opacity-50',
-                        onEnd: async function () {
-                            // Get new order
-                            const newOrderIds = Array.from(container.children).map(el => el.dataset.id);
-                            // Update local state purely for order (not mutating actual objects yet)
-                            state.apps.sort((a,b) => newOrderIds.indexOf(a.id) - newOrderIds.indexOf(b.id));
-                            // Save to API
-                            await api.call('updateAppOrder', { order: newOrderIds });
-                        },
+                    // Render Cards in this section
+                    appsInSection.sort((a,b) => a.order - b.order).forEach(app => {
+                        const card = document.createElement('div');
+                        card.className = `app-card group bg-white dark:bg-cardDark rounded-2xl p-6 shadow-soft border border-gray-100 dark:border-gray-800 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg relative flex flex-col h-full ${!app.active ? 'opacity-60' : ''}`;
+                        card.dataset.id = app.id;
+                        card.dataset.category = category; // store original category
+                        
+                        let adminControls = '';
+                        if(isAdmin) {
+                            adminControls = `
+                                <div class="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                    <button onclick="toggleAppStatus('${app.id}', ${!app.active})" class="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-primary hover:bg-primary/10 transition-colors" title="${app.active ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}">
+                                        <i class="ph ${app.active ? 'ph-eye' : 'ph-eye-slash'}"></i>
+                                    </button>
+                                    <button onclick="editApp('${app.id}')" class="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors" title="แก้ไข">
+                                        <i class="ph ph-pencil-simple"></i>
+                                    </button>
+                                    <button onclick="confirmDeleteApp('${app.id}')" class="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="ลบ">
+                                        <i class="ph ph-trash"></i>
+                                    </button>
+                                    <div class="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 cursor-move drag-handle hover:text-gray-700 dark:hover:text-gray-200">
+                                        <i class="ph ph-dots-six-vertical"></i>
+                                    </div>
+                                </div>
+                            `;
+                        }
+
+                        const badgeColors = {
+                            admin: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+                            staff: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+                            employee: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+                            therapist: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
+                        };
+                        const roleBadges = app.roles.map(r => `<span class="text-[10px] px-2 py-0.5 rounded-full font-medium ${badgeColors[r] || badgeColors.employee}">${roleDisplayNames[r] || r}</span>`).join('');
+
+                        card.innerHTML = `
+                            ${adminControls}
+                            ${!app.active && isAdmin ? '<div class="absolute -top-3 -left-3 bg-gray-500 text-white text-[10px] px-2 py-1 rounded-lg font-medium shadow-md">ปิดการใช้งาน</div>' : ''}
+                            
+                            <div class="w-14 h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center text-3xl mb-4 group-hover:scale-110 transition-transform">
+                                <i class="ph ph-${app.icon || 'app-window'}"></i>
+                            </div>
+                            <h3 class="text-lg font-bold text-gray-800 dark:text-white mb-1">${app.name}</h3>
+                            <p class="text-sm text-gray-500 dark:text-gray-400 flex-1 line-clamp-2">${app.desc || 'ไม่มีรายละเอียด'}</p>
+                            
+                            <div class="flex flex-wrap gap-1 mt-4 mb-5">
+                                ${roleBadges}
+                            </div>
+
+                            <a href="${app.url}" target="_blank" class="block w-full text-center py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 font-medium hover:bg-primary hover:text-white hover:border-primary transition-all mt-auto group-hover:bg-primary group-hover:text-white group-hover:border-primary group-hover:shadow-md group-hover:shadow-primary/20">
+                                เปิดใช้งาน
+                            </a>
+                        `;
+                        gridContainer.appendChild(card);
                     });
-                }
+
+                    // Init SortableJS for this specific category grid
+                    if(isAdmin) {
+                        const sortable = new Sortable(gridContainer, {
+                            group: 'shared', // set both lists to same group to allow drag between categories
+                            animation: 150,
+                            handle: '.drag-handle',
+                            ghostClass: 'opacity-50',
+                            onEnd: async function (evt) {
+                                // Gather ALL card IDs in their new global visual order
+                                const allCards = document.querySelectorAll('.app-card');
+                                const newOrderIds = Array.from(allCards).map(el => el.dataset.id);
+                                
+                                // Update local state purely for order
+                                state.apps.sort((a,b) => newOrderIds.indexOf(a.id) - newOrderIds.indexOf(b.id));
+                                
+                                // Optional: If dragged to a new category, update its category in background (Advanced, skipped for stability, requires more logic to find new parent cat). 
+                                // Currently it just updates the display order index.
+                                
+                                // Save to API
+                                await api.call('updateAppOrder', { order: newOrderIds });
+                            },
+                        });
+                        state.sortableInstances.push(sortable);
+                    }
+                });
+            }
+        }
+
+        // Toggle Expand/Collapse Category
+        function toggleCategory(gridId, iconId) {
+            const grid = document.getElementById(gridId);
+            const icon = document.getElementById(iconId);
+            
+            if (grid.style.display === 'none' || grid.classList.contains('hidden')) {
+                grid.style.display = '';
+                grid.classList.remove('hidden');
+                grid.classList.add('grid');
+                icon.classList.replace('ph-caret-down', 'ph-caret-up');
+            } else {
+                grid.style.display = 'none';
+                grid.classList.add('hidden');
+                grid.classList.remove('grid');
+                icon.classList.replace('ph-caret-up', 'ph-caret-down');
             }
         }
 
@@ -1044,6 +1119,7 @@
                 if(app) {
                     document.getElementById('appId').value = app.id;
                     document.getElementById('appName').value = app.name;
+                    document.getElementById('appCategory').value = app.category || '';
                     document.getElementById('appIcon').value = app.icon;
                     document.getElementById('iconPreview').innerHTML = `<i class="ph ph-${app.icon}"></i>`;
                     document.getElementById('appDesc').value = app.desc;
@@ -1057,6 +1133,7 @@
             } else {
                 document.getElementById('appModalTitle').innerText = 'เพิ่มแอปพลิเคชันใหม่';
                 document.getElementById('appActive').checked = true;
+                document.getElementById('appCategory').value = '';
                 // Default checked all roles for new app
                 document.querySelectorAll('.app-role-checkbox').forEach(cb => cb.checked = true);
             }
@@ -1091,6 +1168,7 @@
             const payload = {
                 id: document.getElementById('appId').value || undefined,
                 name: document.getElementById('appName').value,
+                category: document.getElementById('appCategory').value,
                 icon: document.getElementById('appIcon').value,
                 desc: document.getElementById('appDesc').value,
                 url: document.getElementById('appUrl').value,
